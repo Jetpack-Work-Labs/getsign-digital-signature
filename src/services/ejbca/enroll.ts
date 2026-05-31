@@ -81,37 +81,6 @@ const certFromBase64Der = (b64: string): forge.pki.Certificate =>
     forge.asn1.fromDer(forge.util.decode64(b64))
   );
 
-// Register the end entity in EJBCA so the CSR can be enrolled against it.
-// USERGENERATED token => EJBCA only signs our CSR, it does not generate keys.
-const addEndEntity = async (
-  username: string,
-  password: string,
-  subjectDn: string
-): Promise<void> => {
-  try {
-    await ejbca().post("/endentity", {
-      username,
-      password,
-      subject_dn: subjectDn,
-      ca_name: config.ejbca.signingCa,
-      certificate_profile_name: config.ejbca.certProfile,
-      end_entity_profile_name: config.ejbca.eeProfile,
-      token: "USERGENERATED",
-      status: "NEW",
-    });
-  } catch (error: any) {
-    // Already exists (re-enrollment) — reset it to NEW and reuse below.
-    const status = error?.response?.status;
-    if (status === 409 || status === 400) {
-      console.warn(
-        `End entity ${username} already exists; proceeding to enrollment.`
-      );
-      return;
-    }
-    throw error;
-  }
-};
-
 export interface EnrollResult {
   /** Path to the per-company PKCS#12 keystore: {keystoreDir}/{accountId}.p12 */
   keystorePath: string;
@@ -133,8 +102,8 @@ export const enrollViaEjbca = async (
   try {
     const { privateKey, csrPem } = generateKeyPairAndCsr(dto);
 
-    await addEndEntity(username, enrollmentCode, subjectDn);
-
+    // pkcs10enroll creates the end entity automatically on first enrollment
+    // in EJBCA CE — no prior /endentity call needed.
     const { data } = await ejbca().post("/certificate/pkcs10enroll", {
       certificate_request: csrPem,
       certificate_profile_name: config.ejbca.certProfile,
