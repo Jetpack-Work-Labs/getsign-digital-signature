@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.gitignore
+ejbca-db
+signserver-db
+signserver-data
+keystores
+.env
+*.p12
+*.pem
+src/tmp
+sample.pdf
+out.pdf
+npm-debug.log
