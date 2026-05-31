@@ -8,13 +8,26 @@ import { CertificateDto } from "../../interfaces";
 import { Sentry } from "../../infrastructure";
 
 // EJBCA REST is reached with a SuperAdmin client certificate over mutual TLS.
-const adminAgent = (): https.Agent =>
-  new https.Agent({
-    pfx: fs.readFileSync(config.ejbca.adminP12),
-    passphrase: config.ejbca.adminPassphrase,
-    // Dev: EJBCA serves a self-signed TLS cert. Pin a CA / set true in prod.
-    rejectUnauthorized: false,
-  });
+// Using PEM cert+key (not PKCS#12) because Node 22/OpenSSL 3 rejects EJBCA's
+// legacy-encrypted P12 files at the TLS handshake level.
+const adminAgent = (): https.Agent => {
+  const certPath = config.ejbca.adminP12.replace(/\.p12$/, ".pem");
+  const keyPath = config.ejbca.adminP12.replace(/\.p12$/, "-key.pem");
+  const hasPem = fs.existsSync(certPath) && fs.existsSync(keyPath);
+  return new https.Agent(
+    hasPem
+      ? {
+          cert: fs.readFileSync(certPath),
+          key: fs.readFileSync(keyPath),
+          rejectUnauthorized: false,
+        }
+      : {
+          pfx: fs.readFileSync(config.ejbca.adminP12),
+          passphrase: config.ejbca.adminPassphrase,
+          rejectUnauthorized: false,
+        }
+  );
+};
 
 const ejbca = () =>
   axios.create({
