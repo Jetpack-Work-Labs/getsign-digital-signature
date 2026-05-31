@@ -39,6 +39,10 @@ services:
     ports:
       - "8082:8080"
       - "8445:8443"
+    volumes:
+      # Truststore enabling mutual TLS client certificate auth on the REST API.
+      # Contains ManagementCA so EJBCA can verify the superadmin client cert.
+      - ./ejbca-secrets/tls/ts:/mnt/external/secrets/tls/ts:ro
 
   getsign-app:
     container_name: getsign-app
