@@ -1,4 +1,3 @@
-export { ApplicationService } from "./application";
-export { UserService } from "./users";
-export { EnvelopeService } from "./envelope";
-export { FileDetailsService } from "./fileDetails";
+// Services exported for use by other modules.
+// Certificate and application services have been removed — state is now
+// file-based (per-company P12 in /keystores) with no database dependency.

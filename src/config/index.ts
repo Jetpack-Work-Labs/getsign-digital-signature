@@ -10,6 +10,11 @@ const LoadFromEnv = (key: string) => {
   throw new Error(`process.env doesn't have the key ${key}`);
 };
 
+const LoadFromEnvOr = (key: string, fallback: string): string => {
+  const value = process.env[key];
+  return typeof value !== "undefined" && value !== "" ? value : fallback;
+};
+
 export const config: IServerEnv = {
   env: LoadFromEnv("ENVIRONMENT") as "development" | "production",
   aws: {
@@ -20,12 +25,20 @@ export const config: IServerEnv = {
     },
     queueUrl: LoadFromEnv("SQS_SIGNING_QUEUE_URL"),
   },
-  db: LoadFromEnv("DB_URL"),
-  encryption: {
-    encKey: LoadFromEnv("SOME_32BYTE_BASE64_STRING"),
-    sigKey: LoadFromEnv("SOME_64BYTE_BASE64_STRING"),
-  },
   sentry: {
     dns: LoadFromEnv("SENTRY_DSN"),
   },
+  ejbca: {
+    restBase: LoadFromEnvOr(
+      "EJBCA_REST_BASE",
+      "https://ejbca:8443/ejbca/ejbca-rest-api/v1"
+    ),
+    adminP12: LoadFromEnvOr("EJBCA_ADMIN_P12", "./superadmin.p12"),
+    adminPassphrase: LoadFromEnvOr("EJBCA_ADMIN_PASSPHRASE", "Root@jetsign"),
+    signingCa: LoadFromEnvOr("EJBCA_SIGNING_CA", "GetSign Signing CA"),
+    certProfile: LoadFromEnvOr("EJBCA_CERT_PROFILE", "GetSignSigning"),
+    eeProfile: LoadFromEnvOr("EJBCA_EE_PROFILE", "GetSignSigning"),
+  },
+  keystoreDir: LoadFromEnvOr("KEYSTORE_DIR", "/keystores"),
+  keystorePassword: LoadFromEnvOr("KEYSTORE_PASSWORD", "changeit"),
 };

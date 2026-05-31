@@ -1,6 +1,5 @@
 export interface IServerEnv {
   env: "development" | "production";
-  db: string;
   aws: {
     region: string;
     credentials: {
@@ -9,11 +8,19 @@ export interface IServerEnv {
     };
     queueUrl: string;
   };
-  encryption: {
-    encKey: string | undefined;
-    sigKey: string | undefined;
-  };
   sentry: {
     dns: string;
   };
+  ejbca: {
+    restBase: string;
+    adminP12: string;
+    adminPassphrase: string;
+    signingCa: string;
+    certProfile: string;
+    eeProfile: string;
+  };
+  // Directory where per-company PKCS#12 keystores live: {keystoreDir}/{accountId}.p12
+  keystoreDir: string;
+  // Single password used for every per-company keystore file.
+  keystorePassword: string;
 }

@@ -9,3 +9,9 @@ src/certificates/
 sample.pdf
 out.pdf
 dist/
+mongo-db
+keystores
+# Admin credentials / CA certs are provisioned locally, never committed
+superadmin.p12
+signserver-admin.p12
+ManagementCA.pem

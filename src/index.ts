@@ -2,12 +2,13 @@ import express from "express";
 import morgan from "morgan";
 import { HandleQueue, pollAndProcessJobs } from "./services/sqs";
 import { config } from "./config";
-import { connectDB, initializeSentry, Sentry } from "./infrastructure";
-import { signPDFStream } from "./services/signserver/sign";
-import { Readable } from "stream";
+import { initializeSentry, Sentry } from "./infrastructure";
+import { signPdf } from "./services/pdf/sign";
 import { addWatermarkToPdf } from "./utils/watermark";
 import { fixPdfForSignServer } from "./utils/pdf-fix";
 import formidable from "formidable";
+import * as fs from "fs";
+import * as path from "path";
 
 // Initialize Sentry before anything else
 initializeSentry();
@@ -33,39 +34,27 @@ app.get("/health", (req, res) => {
   });
 });
 
-// SignServer health check endpoint
-app.get("/health/signserver", async (req, res) => {
+// EJBCA health check
+app.get("/health/ejbca", async (req, res) => {
   try {
-    const { exec } = require("child_process");
-    const util = require("util");
-    const execAsync = util.promisify(exec);
-
-    const { stdout } = await execAsync(
-      "docker exec signserver /opt/keyfactor/signserver/bin/signserver getstatus complete 62823351",
-    );
-
-    res.json({
-      status: "OK",
-      timestamp: new Date().toISOString(),
-      service: "SignServer",
-      workerStatus: stdout,
+    const axios = require("axios");
+    const https = require("https");
+    const fs = require("fs");
+    const agent = new https.Agent({
+      pfx: fs.readFileSync(config.ejbca.adminP12),
+      passphrase: config.ejbca.adminPassphrase,
+      rejectUnauthorized: false,
     });
+    const { data } = await axios.get(`${config.ejbca.restBase}/ca`, {
+      httpsAgent: agent,
+      headers: { "X-Keyfactor-Requested-With": "XMLHttpRequest" },
+      timeout: 5000,
+    });
+    res.json({ status: "OK", timestamp: new Date().toISOString(), cas: data });
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: {
-        service: "signserver",
-        operation: "health_check",
-      },
-      contexts: {
-        signserver: {
-          endpoint: "/health/signserver",
-        },
-      },
-    });
     res.status(500).json({
       status: "ERROR",
       timestamp: new Date().toISOString(),
-      service: "SignServer",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -97,20 +86,25 @@ app.post("/signserver/process", async (req, res) => {
 
       try {
         const filePart = files.datafile?.[0];
-        const workerName = fields.workerName?.[0];
         const watermark = fields.watermark?.[0];
+        const accountId = fields.accountId?.[0];
 
-        console.log({ workerName });
+        console.log({ accountId });
         if (!filePart) {
           res.status(400).json({
-            error:
-              "No file uploaded. Please provide a 'datafile' in the FormData",
+            error: "No file uploaded. Please provide a 'datafile' in the FormData",
           });
           return;
         }
+        if (!accountId) {
+          res.status(400).json({ error: "accountId field is required" });
+          return;
+        }
 
-        if (!workerName) {
-          res.status(400).json({ error: "workerName field is required" });
+        // Derive the keystore path from accountId — no DB lookup needed.
+        const keystorePath = path.join(config.keystoreDir, `${accountId}.p12`);
+        if (!fs.existsSync(keystorePath)) {
+          res.status(404).json({ error: `No signing certificate found for account ${accountId}. Enroll first via SQS.` });
           return;
         }
 
@@ -149,7 +143,7 @@ app.post("/signserver/process", async (req, res) => {
             contexts: {
               file: {
                 filename: filePart.originalFilename,
-                workerName,
+                accountId,
               },
             },
           });
@@ -160,17 +154,14 @@ app.post("/signserver/process", async (req, res) => {
           processedPdfBuffer = await addWatermarkToPdf(processedPdfBuffer);
         }
 
-        const fileStream = new Readable();
-        fileStream.push(processedPdfBuffer);
-        fileStream.push(null); // End the stream
-
-        // Step 3: Digitally sign the PDF
-        await signPDFStream({
-          inputStream: fileStream,
-          outputStream: res,
-          WORKER_NAME: workerName,
-          filename: filePart.originalFilename || "document.pdf",
+        // Step 3: Digitally sign locally using the company's EJBCA-issued cert.
+        const signedBuffer = await signPdf({
+          pdfBuffer: processedPdfBuffer,
+          keystorePath,
+          keystorePassword: config.keystorePassword,
+          name: filePart.originalFilename || "document.pdf",
         });
+        res.end(signedBuffer);
       } catch (parseError) {
         console.error("Error processing request:", parseError);
         Sentry.captureException(parseError, {
@@ -220,10 +211,6 @@ app.use(
 // Initialize the application
 const initializeApp = async () => {
   try {
-    // Connect to database
-    await connectDB(config.db);
-    console.log("✅ Database connected successfully");
-
     // Start SQS polling
     pollAndProcessJobs(HandleQueue);
     console.log("✅ SQS polling started");

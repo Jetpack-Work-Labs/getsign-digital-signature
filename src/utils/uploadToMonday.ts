@@ -1,5 +1,8 @@
 import axios, { AxiosResponse } from "axios";
-import { MondayApiResponse, UploadMondayFIle } from "../interfaces";
+
+interface FileData { name?: string; type: string; bytes: ArrayBuffer; }
+interface UploadMondayFIle { itemId: number; columnId: string; file: FileData; token: string; }
+interface MondayApiResponse { data: unknown; }
 
 const uploadContract = async ({
   itemId,

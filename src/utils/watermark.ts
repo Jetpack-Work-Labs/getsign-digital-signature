@@ -18,7 +18,7 @@ export async function addWatermarkToPdf(pdfBuffer: Buffer): Promise<Buffer> {
 
   const watermarkImagePath = path.resolve(
     __dirname,
-    "../../public/watermark/watermark.png"
+    "../public/watermark/watermark.png"
   );
 
   if (!fs.existsSync(watermarkImagePath)) {
