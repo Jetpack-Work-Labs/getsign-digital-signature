@@ -2,7 +2,9 @@ export interface IServerEnv {
   env: "development" | "production";
   aws: {
     region: string;
-    credentials: {
+    // Omit when running on EC2 with an IAM role — SDK picks up credentials
+    // automatically from the instance metadata service.
+    credentials?: {
       accessKeyId: string;
       secretAccessKey: string;
     };

@@ -19,10 +19,16 @@ export const config: IServerEnv = {
   env: LoadFromEnv("ENVIRONMENT") as "development" | "production",
   aws: {
     region: LoadFromEnv("AWS_REGION")!,
-    credentials: {
-      accessKeyId: LoadFromEnv("AWS_ACCESS_KEY_ID")!,
-      secretAccessKey: LoadFromEnv("AWS_SECRET_ACCESS_KEY")!,
-    },
+    // When running on EC2 with an IAM role these are not set — the AWS SDK
+    // picks up credentials from the instance metadata service automatically.
+    ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+      ? {
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+          },
+        }
+      : {}),
     queueUrl: LoadFromEnv("SQS_SIGNING_QUEUE_URL"),
   },
   sentry: {
