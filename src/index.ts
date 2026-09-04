@@ -115,6 +115,7 @@ app.post("/signserver/process", async (req, res) => {
         }
 
         const shouldAddWatermark = watermark === "true";
+        const processStartedAt = Date.now();
 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
@@ -131,6 +132,16 @@ app.post("/signserver/process", async (req, res) => {
         } else {
           throw new Error("No file data found");
         }
+
+        console.log(
+          JSON.stringify({
+            message: "POST /process - digital sign start",
+            workerName,
+            filename: filePart.originalFilename,
+            watermark: shouldAddWatermark,
+            inputBytes: processedPdfBuffer.length,
+          }),
+        );
 
         // Step 1: Fix PDF metadata first (creates a new doc via copyPages, which strips annotations)
         try {
@@ -171,7 +182,26 @@ app.post("/signserver/process", async (req, res) => {
           WORKER_NAME: workerName,
           filename: filePart.originalFilename || "document.pdf",
         });
+        console.log(
+          JSON.stringify({
+            message: "POST /process - digital sign handler returned",
+            workerName,
+            filename: filePart.originalFilename,
+            durationMs: Date.now() - processStartedAt,
+          }),
+        );
       } catch (parseError) {
+        console.error(
+          JSON.stringify({
+            message: "POST /process - digital sign failed",
+            workerName: fields.workerName?.[0],
+            filename: files.datafile?.[0]?.originalFilename,
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          }),
+        );
         console.error("Error processing request:", parseError);
         Sentry.captureException(parseError, {
           tags: {

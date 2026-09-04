@@ -16,10 +16,17 @@ export async function signPDFStream({
   WORKER_NAME: string;
   filename?: string;
 }): Promise<void> {
+  const startedAt = Date.now();
   try {
     const form = new FormData();
 
-    console.log("Signing PDF with worker:", WORKER_NAME);
+    console.log(
+      JSON.stringify({
+        message: "signPDFStream - calling SignServer",
+        worker: WORKER_NAME,
+        filename,
+      }),
+    );
     form.append("workerName", WORKER_NAME);
     form.append("datafile", inputStream, {
       filename,
@@ -36,10 +43,59 @@ export async function signPDFStream({
         rejectUnauthorized: false, // Only for testing, enable in production
       }),
     });
+    console.log(
+      JSON.stringify({
+        message: "signPDFStream - SignServer headers received",
+        worker: WORKER_NAME,
+        filename,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+      }),
+    );
+    response.data.on("end", () => {
+      console.log(
+        JSON.stringify({
+          message: "signPDFStream - SignServer stream ended",
+          worker: WORKER_NAME,
+          filename,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
+    });
+    response.data.on("error", (streamErr: Error) => {
+      console.error(
+        JSON.stringify({
+          message: "signPDFStream - SignServer stream error",
+          worker: WORKER_NAME,
+          filename,
+          durationMs: Date.now() - startedAt,
+          error: streamErr.message,
+        }),
+      );
+    });
+    outputStream.on("finish", () => {
+      console.log(
+        JSON.stringify({
+          message: "signPDFStream - output stream finished",
+          worker: WORKER_NAME,
+          filename,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
+    });
     response.data.pipe(outputStream);
   } catch (err) {
+    const durationMs = Date.now() - startedAt;
     if (err instanceof Error) {
-      console.error("❌ Error signing PDF stream:", err.message);
+      console.error(
+        JSON.stringify({
+          message: "signPDFStream - SignServer request failed",
+          worker: WORKER_NAME,
+          filename,
+          durationMs,
+          error: err.message,
+        }),
+      );
     } else {
       console.error("❌ Unknown error signing PDF stream");
     }
