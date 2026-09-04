@@ -34,6 +34,15 @@ export const signPdf = async ({
   name?: string;
   location?: string;
 }): Promise<Buffer> => {
+  const startedAt = Date.now();
+  console.log(
+    JSON.stringify({
+      message: "signPdf - starting local PAdES sign",
+      name,
+      keystorePath,
+      inputBytes: pdfBuffer.length,
+    }),
+  );
   try {
     // Step 1: add signature placeholder with pdf-lib.
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -52,9 +61,26 @@ export const signPdf = async ({
     const p12Buffer = fs.readFileSync(keystorePath);
     const p12Signer = new P12Signer(p12Buffer, { passphrase: keystorePassword });
     const signedPdf = await signer.sign(pdfWithPlaceholder, p12Signer);
+    const signedBuffer = Buffer.from(signedPdf);
+    console.log(
+      JSON.stringify({
+        message: "signPdf - local PAdES sign succeeded",
+        name,
+        durationMs: Date.now() - startedAt,
+        signedBytes: signedBuffer.length,
+      }),
+    );
 
-    return Buffer.from(signedPdf);
+    return signedBuffer;
   } catch (error) {
+    console.error(
+      JSON.stringify({
+        message: "signPdf - local PAdES sign failed",
+        name,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
     Sentry.captureException(error, {
       tags: { service: "pdf", operation: "sign_pdf" },
       contexts: { pdf: { keystorePath } },
