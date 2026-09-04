@@ -88,15 +88,65 @@ app.post("/signserver/process", async (req, res) => {
         const filePart = files.datafile?.[0];
         const watermark = fields.watermark?.[0];
         const accountId = fields.accountId?.[0];
+        const workerName = fields.workerName?.[0];
+        const fieldSummary = Object.fromEntries(
+          Object.entries(fields).map(([key, value]) => [
+            key,
+            {
+              type: Array.isArray(value) ? `array(${value.length})` : typeof value,
+              value: Array.isArray(value) ? value[0] : value,
+            },
+          ]),
+        );
 
-        console.log({ accountId });
+        console.log(
+          JSON.stringify({
+            message: "POST /process - form parsed",
+            fieldKeys: Object.keys(fields),
+            fileKeys: Object.keys(files),
+            fields: fieldSummary,
+            hasDatafile: Boolean(filePart),
+            filename: filePart?.originalFilename,
+          }),
+        );
         if (!filePart) {
+          console.error(
+            JSON.stringify({
+              message: "POST /process - rejected",
+              reason: "missing_datafile",
+              fieldKeys: Object.keys(fields),
+              fileKeys: Object.keys(files),
+            }),
+          );
           res.status(400).json({
-            error: "No file uploaded. Please provide a 'datafile' in the FormData",
+            error:
+              "No file uploaded. Please provide a 'datafile' in the FormData",
           });
           return;
         }
         if (!accountId) {
+          console.error(
+            JSON.stringify({
+              message: "POST /process - rejected",
+              reason: "missing_accountId",
+              fieldKeys: Object.keys(fields),
+              fields: fieldSummary,
+              workerName: workerName ?? null,
+            }),
+          );
+          Sentry.captureMessage("POST /process rejected: missing_accountId", {
+            level: "error",
+            tags: {
+              service: "signserver",
+              operation: "process_request",
+              reason: "missing_accountId",
+            },
+            extra: {
+              fieldKeys: Object.keys(fields),
+              fields: fieldSummary,
+              workerName: workerName ?? null,
+            },
+          });
           res.status(400).json({ error: "accountId field is required" });
           return;
         }
@@ -104,21 +154,20 @@ app.post("/signserver/process", async (req, res) => {
         // Derive the keystore path from accountId — no DB lookup needed.
         const keystorePath = path.join(config.keystoreDir, `${accountId}.p12`);
         if (!fs.existsSync(keystorePath)) {
+          console.error(
+            JSON.stringify({
+              message: "POST /process - rejected",
+              reason: "missing_keystore",
+              accountId,
+              keystorePath,
+            }),
+          );
           res.status(404).json({ error: `No signing certificate found for account ${accountId}. Enroll first via SQS.` });
           return;
         }
 
         const shouldAddWatermark = watermark === "true";
         const processStartedAt = Date.now();
-        console.log(
-          JSON.stringify({
-            message: "POST /process - digital sign start",
-            accountId,
-            filename: filePart.originalFilename,
-            watermark: shouldAddWatermark,
-            keystorePath,
-          }),
-        );
 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
@@ -135,6 +184,18 @@ app.post("/signserver/process", async (req, res) => {
         } else {
           throw new Error("No file data found");
         }
+
+        console.log(
+          JSON.stringify({
+            message: "POST /process - digital sign start",
+            accountId,
+            workerName: workerName ?? null,
+            filename: filePart.originalFilename,
+            watermark: shouldAddWatermark,
+            keystorePath,
+            inputBytes: processedPdfBuffer.length,
+          }),
+        );
 
         // Step 1: Fix PDF metadata first (creates a new doc via copyPages, which strips annotations)
         try {
