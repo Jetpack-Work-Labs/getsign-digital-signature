@@ -4,7 +4,32 @@ import { certificatePath, generateRandomPassword } from "../../utils";
 import { CertificateDto } from "../../interfaces";
 
 const friendlyName = "signer00003";
+export const CERT_VALIDITY_YEARS = 5;
+const RENEW_BEFORE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export { CertificateService } from "./certificate";
+
+export function p12NeedsRenewal(filePath: string, password: string): boolean {
+  if (!fs.existsSync(filePath)) {
+    return true;
+  }
+  try {
+    const p12 = forge.pkcs12.pkcs12FromAsn1(
+      forge.asn1.fromDer(fs.readFileSync(filePath).toString("binary")),
+      password
+    );
+    const bags = p12.getBags({ bagType: forge.pki.oids.certBag })[
+      forge.pki.oids.certBag
+    ];
+    const until = bags?.[0]?.cert?.validity.notAfter;
+    if (!until) {
+      return true;
+    }
+    return until.getTime() - Date.now() < RENEW_BEFORE_MS;
+  } catch {
+    return true;
+  }
+}
 
 export const createCertificate = ({
   serialNumber,
@@ -13,6 +38,7 @@ export const createCertificate = ({
   state,
   localityName,
   organizationName,
+  password: existingPassword,
 }: CertificateDto) => {
   const pki = forge.pki;
   const keys: forge.pki.KeyPair = pki.rsa.generateKeyPair(2048);
@@ -22,7 +48,9 @@ export const createCertificate = ({
   cert.serialNumber = serialNumber;
   cert.validity.notBefore = new Date();
   cert.validity.notAfter = new Date();
-  cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1);
+  cert.validity.notAfter.setFullYear(
+    cert.validity.notBefore.getFullYear() + CERT_VALIDITY_YEARS
+  );
 
   const attrs: forge.pki.CertificateField[] = [
     { name: "commonName", value: commonName },
@@ -37,7 +65,7 @@ export const createCertificate = ({
   cert.setIssuer(attrs);
   cert.sign(keys.privateKey);
 
-  const password = generateRandomPassword();
+  const password = existingPassword || generateRandomPassword();
   const p12Asn1 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, cert, password, {
     algorithm: "3des",
     friendlyName,
@@ -48,5 +76,5 @@ export const createCertificate = ({
   }
   const cp = certificatePath + "/" + serialNumber + ".p12";
   fs.writeFileSync(cp, Buffer.from(p12Der, "binary"));
-  return { certificatePath: cp, password };
+  return { certificatePath: cp, password, validUntil: cert.validity.notAfter };
 };

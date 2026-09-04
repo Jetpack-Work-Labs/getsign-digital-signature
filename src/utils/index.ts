@@ -10,4 +10,5 @@ export {
   CreateCryptoToken,
   createPdfWOrker,
   activateAll,
+  reloadWorker,
 } from "./worker";

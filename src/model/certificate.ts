@@ -32,6 +32,10 @@ const schema = new Schema<Icertificate>(
       type: String,
       required: false,
     },
+    validUntil: {
+      type: Date,
+      required: false,
+    },
   },
   {
     timestamps: {

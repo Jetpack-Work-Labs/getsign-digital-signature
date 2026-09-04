@@ -25,7 +25,16 @@ export class CertificateService {
     return await this.model.updateMany(
       { accountId: payload.accountId },
       {
-        $set: { workerId: payload.workerId, tokenId: payload.tokenId },
+        $set: {
+          workerId: payload.workerId,
+          tokenId: payload.tokenId,
+          ...(payload.validUntil ? { validUntil: payload.validUntil } : {}),
+          ...(payload.fileUrl ? { fileUrl: payload.fileUrl } : {}),
+          ...(payload.fileName ? { fileName: payload.fileName } : {}),
+          ...(payload.dockerFilePath
+            ? { dockerFilePath: payload.dockerFilePath }
+            : {}),
+        },
       }
     );
   }

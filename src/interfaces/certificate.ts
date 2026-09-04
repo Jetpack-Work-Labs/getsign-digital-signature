@@ -5,6 +5,7 @@ export interface CertificateDto {
   state: string;
   localityName: string;
   organizationName: string;
+  password?: string;
 }
 
 export interface Icertificate {
@@ -15,6 +16,7 @@ export interface Icertificate {
   dockerFilePath: string;
   workerId?: string;
   tokenId?: string;
+  validUntil?: Date;
 }
 
 interface FileData {
