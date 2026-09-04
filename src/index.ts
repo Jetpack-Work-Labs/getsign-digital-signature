@@ -109,6 +109,16 @@ app.post("/signserver/process", async (req, res) => {
         }
 
         const shouldAddWatermark = watermark === "true";
+        const processStartedAt = Date.now();
+        console.log(
+          JSON.stringify({
+            message: "POST /process - digital sign start",
+            accountId,
+            filename: filePart.originalFilename,
+            watermark: shouldAddWatermark,
+            keystorePath,
+          }),
+        );
 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
@@ -161,8 +171,28 @@ app.post("/signserver/process", async (req, res) => {
           keystorePassword: config.keystorePassword,
           name: filePart.originalFilename || "document.pdf",
         });
+        console.log(
+          JSON.stringify({
+            message: "POST /process - digital sign handler returned",
+            accountId,
+            filename: filePart.originalFilename,
+            durationMs: Date.now() - processStartedAt,
+            signedBytes: signedBuffer.length,
+          }),
+        );
         res.end(signedBuffer);
       } catch (parseError) {
+        console.error(
+          JSON.stringify({
+            message: "POST /process - digital sign failed",
+            accountId: fields.accountId?.[0],
+            filename: files.datafile?.[0]?.originalFilename,
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          }),
+        );
         console.error("Error processing request:", parseError);
         Sentry.captureException(parseError, {
           tags: {
