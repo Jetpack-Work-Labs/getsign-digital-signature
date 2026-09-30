@@ -1,10 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as forge from "node-forge";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { uploadFile } from "../../utils";
 import { SignJob } from "../../interfaces";
-import { enrollViaEjbca } from "../ejbca/enroll";
 import { config } from "../../config";
+import { enrollInWorker } from "../jobs/pool";
+import { enrollmentIdentity } from "../ca/subject";
+import { s3 } from "../../utils/aws";
+import { BUCKET_NAME } from "../../const";
+import { fileName } from "../../utils/path";
 
 const RENEW_BEFORE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -30,11 +35,33 @@ function p12NeedsRenewal(filePath: string, password: string): boolean {
   }
 }
 
+async function restoreKeystoreFromS3(keystorePath: string): Promise<boolean> {
+  const Key = fileName(keystorePath, "p12");
+  try {
+    const response = await s3.send(
+      new GetObjectCommand({ Bucket: BUCKET_NAME, Key }),
+    );
+    const body = response.Body;
+    if (!body) return false;
+    const bytes = Buffer.from(await body.transformToByteArray());
+    fs.mkdirSync(path.dirname(keystorePath), { recursive: true });
+    fs.writeFileSync(keystorePath, bytes, { mode: 0o600 });
+    console.log(`✅ Restored keystore from S3 → ${keystorePath}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Provision a company's signing certificate on first encounter.
 // Re-enroll when the existing P12 is missing, unreadable, or within 30 days of expiry.
 export const HandleQueue = async (job: SignJob): Promise<void> => {
-  const { accountId, companyName, userEmail, organizationName, countryName } = job;
+  const { accountId, countryName } = job;
   const keystorePath = path.join(config.keystoreDir, `${accountId}.p12`);
+
+  if (!fs.existsSync(keystorePath)) {
+    await restoreKeystoreFromS3(keystorePath);
+  }
 
   if (
     fs.existsSync(keystorePath) &&
@@ -44,13 +71,14 @@ export const HandleQueue = async (job: SignJob): Promise<void> => {
     return;
   }
 
-  const { keystorePath: writtenPath } = await enrollViaEjbca({
+  const identity = enrollmentIdentity(job);
+  const { keystorePath: writtenPath } = await enrollInWorker({
     serialNumber: `${accountId}`,
-    commonName: `${companyName} (${userEmail})`,
+    commonName: identity.commonName,
     countryName: countryName || "",
     state: "",
     localityName: "",
-    organizationName: organizationName || "",
+    organizationName: identity.organizationName,
   });
 
   await uploadFile({ filePath: writtenPath, type: "p12" });

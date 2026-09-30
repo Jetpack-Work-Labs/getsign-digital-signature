@@ -25,4 +25,8 @@ export interface IServerEnv {
   keystoreDir: string;
   // Single password used for every per-company keystore file.
   keystorePassword: string;
+  caDir: string;
+  jobsDir: string;
+  // When set, sign routes require this value in the x-sign-token header.
+  signApiToken: string;
 }

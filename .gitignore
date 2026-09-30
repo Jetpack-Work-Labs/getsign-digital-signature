@@ -11,6 +11,7 @@ out.pdf
 dist/
 mongo-db
 keystores
+/ca
 # Admin credentials / CA certs are provisioned locally, never committed
 superadmin.p12
 signserver-admin.p12

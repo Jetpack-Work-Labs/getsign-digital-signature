@@ -12,5 +12,6 @@
       "@services/*": ["./services/*"],
       "@types/*": ["./types/*"]
     },
-  }
+  },
+  "exclude": ["test", "dist", "node_modules"]
 }
