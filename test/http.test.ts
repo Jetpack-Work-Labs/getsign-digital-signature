@@ -41,6 +41,10 @@ test("sign routes accept a job, return the PDF, and reject overflow", async () =
     const health = await fetch(`${base}/health`);
     assert.equal(health.status, 200);
 
+    const signing = await fetch(`${base}/health/sign`);
+    assert.equal(signing.status, 200);
+    assert.equal((await signing.json()).signed, true);
+
     const enrolled = await fetch(`${base}/signserver/certificates/http-account`, {
       headers,
     });

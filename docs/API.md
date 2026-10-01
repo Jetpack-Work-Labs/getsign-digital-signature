@@ -8,6 +8,12 @@ When `SIGN_API_TOKEN` is set, sign routes require header `x-sign-token`. Health 
 
 `200` with `{ "status": "OK", "service": "GetSign Flow Service", "version": "2.0.0" }`.
 
+## GET /health/sign
+
+Signs a tiny PDF with a dedicated health keystore. This is the check an external probe should call, through the same host and port the backend uses.
+
+`200` `{ "status": "OK", "signed": true }` when the signature contains `/ByteRange`. `500` when the CA or the signature step fails. The failure is sent to Sentry when `SENTRY_DSN` is set.
+
 ## GET /health/ejbca
 
 Reports whether the local CA files exist. The path is unchanged so older monitors keep working. It does not call EJBCA.

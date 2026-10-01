@@ -6,6 +6,7 @@ import formidable from "formidable";
 import * as fs from "fs";
 import * as path from "path";
 import { localCaReady } from "./services/ca/local";
+import { probeSigning } from "./services/pdf/health-sign";
 import {
   releaseSignSlot,
   signInWorker,
@@ -50,6 +51,19 @@ function authorize(req: express.Request, res: express.Response): boolean {
   res.status(401).json({ error: "unauthorized" });
   return false;
 }
+
+// Signs a tiny PDF. A process that is up but cannot sign returns 500.
+app.get("/health/sign", async (_req, res) => {
+  try {
+    await probeSigning();
+    res.json({ status: "OK", signed: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: "signing health check failed", error: message }));
+    Sentry.captureException(error);
+    res.status(500).json({ status: "ERROR", error: message });
+  }
+});
 
 // Kept at the old path so existing monitors do not 404.
 app.get("/health/ejbca", (_req, res) => {

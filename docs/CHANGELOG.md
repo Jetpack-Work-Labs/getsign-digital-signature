@@ -11,6 +11,7 @@
 - `POST /signserver/process` still returns the PDF and uses the same two-slot cap.
 - `accountId` or `workerName` selects the P12. Uploads over 50mb receive `413`.
 - When `SIGN_API_TOKEN` is set, sign routes require `x-sign-token`.
+- `GET /health/sign` signs a tiny PDF and returns 500 when that fails, so a monitor can tell a live process from a working signer.
 
 ### Local certificates
 
