@@ -4,6 +4,7 @@ import { SignPdf } from "@signpdf/signpdf";
 import { P12Signer } from "@signpdf/signer-p12";
 import { pdflibAddPlaceholder } from "@signpdf/placeholder-pdf-lib";
 import { Sentry } from "../../infrastructure";
+import { applyWatermark } from "../../utils/watermark";
 
 const signer = new SignPdf();
 
@@ -21,6 +22,7 @@ export const signPdf = async ({
   pdfBuffer,
   keystorePath,
   keystorePassword,
+  watermark = false,
   reason = "Signed via GetSign",
   contactInfo = "",
   name = "",
@@ -29,6 +31,7 @@ export const signPdf = async ({
   pdfBuffer: Buffer;
   keystorePath: string;
   keystorePassword: string;
+  watermark?: boolean;
   reason?: string;
   contactInfo?: string;
   name?: string;
@@ -44,8 +47,12 @@ export const signPdf = async ({
     }),
   );
   try {
-    // Step 1: add signature placeholder with pdf-lib.
+    // One pdf-lib pass: optional watermark, then the signature placeholder.
+    // The old full-document copy existed only to dodge a SignServer metadata crash.
     const pdfDoc = await PDFDocument.load(pdfBuffer);
+    if (watermark) {
+      await applyWatermark(pdfDoc);
+    }
     await pdflibAddPlaceholder({
       pdfDoc,
       reason,

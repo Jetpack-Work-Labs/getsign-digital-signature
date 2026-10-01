@@ -3,10 +3,17 @@ import fs from "fs";
 import path from "path";
 import { GETSIGN_DIGITAL_SIGNATURE_URL } from "../const";
 
-export async function addWatermarkToPdf(pdfBuffer: Buffer): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
+export function watermarkImagePath(): string {
+  return path.resolve(__dirname, "../public/watermark/watermark.png");
+}
+
+/** Draw the watermark onto an already loaded document so signing can stay one pass. */
+export async function applyWatermark(pdfDoc: PDFDocument): Promise<void> {
   const pages = pdfDoc.getPages();
-  const lastPage = pages[pages.length - 1]; // Get the last page
+  const lastPage = pages[pages.length - 1];
+  if (!lastPage) {
+    throw new Error("PDF has no pages to watermark");
+  }
 
   const pageWidth = lastPage.getWidth();
 
@@ -16,17 +23,14 @@ export async function addWatermarkToPdf(pdfBuffer: Buffer): Promise<Buffer> {
   const x = pageWidth - watermarkWidth - margin; // Right side
   const y = margin; // Bottom area
 
-  const watermarkImagePath = path.resolve(
-    __dirname,
-    "../public/watermark/watermark.png"
-  );
+  const imagePath = watermarkImagePath();
 
-  if (!fs.existsSync(watermarkImagePath)) {
-    console.error(`Watermark image not found at: ${watermarkImagePath}`);
-    throw new Error(`Watermark image not found at: ${watermarkImagePath}`);
+  if (!fs.existsSync(imagePath)) {
+    console.error(`Watermark image not found at: ${imagePath}`);
+    throw new Error(`Watermark image not found at: ${imagePath}`);
   }
 
-  const watermarkImageBytes = fs.readFileSync(watermarkImagePath);
+  const watermarkImageBytes = fs.readFileSync(imagePath);
   const watermarkImage = await pdfDoc.embedPng(watermarkImageBytes);
   lastPage.drawImage(watermarkImage, {
     x,
@@ -58,6 +62,10 @@ export async function addWatermarkToPdf(pdfBuffer: Buffer): Promise<Buffer> {
     lastPage.node.set(PDFName.of("Annots"), newAnnots);
   }
 
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
+}
+
+export async function addWatermarkToPdf(pdfBuffer: Buffer): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  await applyWatermark(pdfDoc);
+  return Buffer.from(await pdfDoc.save());
 }

@@ -47,4 +47,7 @@ export const config: IServerEnv = {
   },
   keystoreDir: LoadFromEnvOr("KEYSTORE_DIR", "/keystores"),
   keystorePassword: LoadFromEnvOr("KEYSTORE_PASSWORD", "changeit"),
+  caDir: LoadFromEnvOr("CA_DIR", "/ca"),
+  jobsDir: LoadFromEnvOr("JOBS_DIR", "/tmp/sign-jobs"),
+  signApiToken: LoadFromEnvOr("SIGN_API_TOKEN", ""),
 };

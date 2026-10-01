@@ -17,7 +17,8 @@ ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 9999
-CMD ["npm", "start"]
+# ts-node-dev exits when the process crashes. This loop starts it again.
+CMD ["sh", "scripts/run-server.sh", "npm", "start"]
 
 # ---- build: compile TypeScript -> dist + copy public assets ----
 FROM node:22-bookworm-slim AS build
@@ -33,5 +34,8 @@ ENV NODE_ENV=production
 COPY package.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
+COPY scripts/run-server.sh /usr/local/bin/run-server.sh
 EXPOSE 9999
-CMD ["node", "dist/index.js"]
+# A crash exits node. The loop starts it again. Docker still restarts the
+# container if this process is killed.
+CMD ["sh", "/usr/local/bin/run-server.sh", "node", "dist/index.js"]

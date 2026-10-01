@@ -5,53 +5,13 @@ networks:
     driver: bridge
 
 services:
-  ejbca-database:
-    container_name: ejbca-database
-    image: "mariadb:latest"
-    restart: always
-    networks:
-      - application-bridge
-    environment:
-      - MYSQL_ROOT_PASSWORD=Root123@
-      - MYSQL_DATABASE=ejbca
-      - MYSQL_USER=ejbca
-      - MYSQL_PASSWORD=ejbca
-    volumes:
-      - ./ejbca-db:/var/lib/mysql:rw
-
-  ejbca:
-    hostname: ejbca-node1
-    container_name: ejbca
-    image: keyfactor/ejbca-ce:latest
-    restart: always
-    depends_on:
-      - ejbca-database
-    networks:
-      - access-bridge
-      - application-bridge
-    environment:
-      - DATABASE_JDBC_URL=jdbc:mariadb://ejbca-database:3306/ejbca?characterEncoding=UTF-8
-      - LOG_LEVEL_APP=INFO
-      - LOG_LEVEL_SERVER=INFO
-      - TLS_SETUP_ENABLED=simple
-      - EJBCA_WEB_RESTAPI_ENABLED=true
-      - JAVA_OPTS_APPEND=-Xms256m -Xmx768m
-    ports:
-      - "8082:8080"
-      - "8445:8443"
-    volumes:
-      # Truststore enabling mutual TLS client certificate auth on the REST API.
-      # Contains ManagementCA so EJBCA can verify the superadmin client cert.
-      - ./ejbca-secrets/tls/ts:/mnt/external/secrets/tls/ts:ro
-
   getsign-app:
     container_name: getsign-app
     build:
       context: .
       target: dev
     restart: always
-    depends_on:
-      - ejbca
+    mem_limit: 1536m
     networks:
       - application-bridge
       - access-bridge
@@ -66,3 +26,4 @@ services:
       - /app/node_modules
       # Keystores written by Node during enrollment, read back at signing time.
       - ./keystores:/keystores:rw
+      - ./ca:/ca:rw

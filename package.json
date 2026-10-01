@@ -7,7 +7,8 @@
     "start": "ts-node-dev src/index.ts",
     "build": "tsc && npm run copy-public",
     "copy-public": "cp -r src/public dist/",
-    "serve": "node dist/index.js"
+    "serve": "node dist/index.js",
+    "test": "NODE_ENV=test ENVIRONMENT=development AWS_REGION=us-east-1 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test SQS_SIGNING_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/000000000000/local SENTRY_DSN= KEYSTORE_DIR=/tmp/getsign-flow-test/keystores CA_DIR=/tmp/getsign-flow-test/ca JOBS_DIR=/tmp/getsign-flow-test/jobs KEYSTORE_PASSWORD=test-password SIGN_API_TOKEN=test-token node --require ts-node/register/transpile-only --test --test-concurrency=1 --test-force-exit test/*.test.ts"
   },
   "keywords": [],
   "author": "",
